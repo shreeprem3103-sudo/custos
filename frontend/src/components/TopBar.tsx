@@ -120,8 +120,18 @@ export function TopBar({
           </Chip>
         ) : null}
         {health ? (
-          <Chip tone="tone-mute" title="Ingest pipelines: connectors with a healthy last poll.">
-            {String((health.checks.connectors as { healthy?: number } | undefined)?.healthy ?? "—")} connectors healthy
+          <Chip
+            tone={
+              ((health.checks.connectors as { degraded?: unknown[] } | undefined)?.degraded?.length ?? 0) > 0 ? "tone-warn" : "tone-ok"
+            }
+            title="Ingest connectors and whether their last poll succeeded. A stale connector is shown, never silently skipped."
+          >
+            {(() => {
+              const connectors = health.checks.connectors as { count?: number; degraded?: unknown[] } | undefined;
+              const total = connectors?.count ?? 0;
+              const stale = connectors?.degraded?.length ?? 0;
+              return total ? `${total - stale} of ${total} connectors healthy` : "no connectors";
+            })()}
           </Chip>
         ) : null}
       </div>

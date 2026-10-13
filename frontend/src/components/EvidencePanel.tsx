@@ -34,7 +34,11 @@ export function EvidencePanel() {
   const kpis = useConsole((state) => state.kpis);
   const toast = useConsole((state) => state.toast);
 
-  const [neighbours, setNeighbours] = useState<GraphEdgeOut[]>([]);
+  const [links, setLinks] = useState<{
+    depends_on: GraphEdgeOut[];
+    supports: GraphEdgeOut[];
+    cascade_reach: string[];
+  }>({ depends_on: [], supports: [], cascade_reach: [] });
   const [audit, setAudit] = useState<AuditEntryOut[]>([]);
   const [chain, setChain] = useState<AuditVerifyOut | null>(null);
 
@@ -47,16 +51,21 @@ export function EvidencePanel() {
 
   useEffect(() => {
     if (!selectedAssetId) {
-      setNeighbours([]);
+      setLinks({ depends_on: [], supports: [], cascade_reach: [] });
       return;
     }
     let cancelled = false;
-    api<{ neighbours?: GraphEdgeOut[]; edges?: GraphEdgeOut[] }>(`/twin/assets/${selectedAssetId}`)
+    api<{ depends_on?: GraphEdgeOut[]; supports?: GraphEdgeOut[]; cascade_reach?: string[] }>(`/twin/assets/${selectedAssetId}`)
       .then((payload) => {
-        if (!cancelled) setNeighbours(payload.neighbours ?? payload.edges ?? []);
+        if (cancelled) return;
+        setLinks({
+          depends_on: payload.depends_on ?? [],
+          supports: payload.supports ?? [],
+          cascade_reach: payload.cascade_reach ?? [],
+        });
       })
       .catch(() => {
-        if (!cancelled) setNeighbours([]);
+        if (!cancelled) setLinks({ depends_on: [], supports: [], cascade_reach: [] });
       });
     return () => {
       cancelled = true;
@@ -137,36 +146,69 @@ export function EvidencePanel() {
             ) : null}
 
             <div>
-              <div className="upper tiny mute">direct dependency links ({neighbours.length})</div>
-              {neighbours.length === 0 ? (
-                <div className="tiny mute">No dependency edges read for this asset.</div>
+              <div className="upper tiny mute">
+                depends on ({links.depends_on.length}) · supports ({links.supports.length}) · cascade reach ({links.cascade_reach.length} assets)
+              </div>
+              <div className="tiny mute" style={{ marginBottom: 4 }}>
+                “Supports” is what breaks if this asset fails. “Cascade reach” is how far the loss propagates through dependent
+                relationships, computed over the whole graph — not a guess about which neighbours “look” important.
+              </div>
+              {links.depends_on.length === 0 ? (
+                <div className="tiny mute">No dependency edges recorded for this asset.</div>
               ) : (
-                <table className="table" style={{ marginTop: 4 }}>
+                <table className="table">
                   <thead>
                     <tr>
-                      <th>direction</th>
-                      <th>other end</th>
+                      <th>depends on</th>
                       <th>relation</th>
-                      <th>weight</th>
+                      <th>state</th>
                       <th>lead</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {neighbours.slice(0, 24).map((edge) => {
-                      const outgoing = edge.source_id === asset.id;
-                      return (
-                        <tr key={edge.id}>
-                          <td className="tiny">{outgoing ? "→ feeds" : "← depends"}</td>
-                          <td className="tiny mono">{outgoing ? edge.target_id : edge.source_id}</td>
-                          <td className="tiny">{edge.kind}</td>
-                          <td className="tiny mono">{edge.weight.toFixed(2)}</td>
-                          <td className="tiny mono">{edge.lead_time_min} m</td>
-                        </tr>
-                      );
-                    })}
+                    {links.depends_on.slice(0, 20).map((edge) => (
+                      <tr key={edge.id}>
+                        <td className="tiny">{edge.name ?? edge.id}</td>
+                        <td className="tiny">{edge.kind}</td>
+                        <td className="tiny">
+                          <Chip tone={statusTone(edge.status ?? "unknown")}>{edge.status ?? "unknown"}</Chip>
+                        </td>
+                        <td className="tiny mono">{edge.lead_time_min ?? 0} m</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               )}
+              {links.supports.length ? (
+                <details className="details" style={{ marginTop: 6 }}>
+                  <summary>Assets that depend on this one ({links.supports.length})</summary>
+                  <table className="table" style={{ marginTop: 6 }}>
+                    <thead>
+                      <tr>
+                        <th>asset</th>
+                        <th>relation</th>
+                        <th>state</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {links.supports.slice(0, 30).map((edge) => (
+                        <tr key={edge.id}>
+                          <td className="tiny">{edge.name ?? edge.id}</td>
+                          <td className="tiny">{edge.kind}</td>
+                          <td className="tiny">
+                            <Chip tone={statusTone(edge.status ?? "unknown")}>{edge.status ?? "unknown"}</Chip>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {links.supports.length > 30 ? (
+                    <div className="tiny mute" style={{ marginTop: 4 }}>
+                      showing 30 of {links.supports.length}
+                    </div>
+                  ) : null}
+                </details>
+              ) : null}
             </div>
 
             {sensors.length ? (

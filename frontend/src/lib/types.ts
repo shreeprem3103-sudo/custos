@@ -104,6 +104,9 @@ export interface GraphNodeOut {
 
 export interface GraphEdgeOut {
   id: string;
+  /** present on the asset-neighbourhood view (`/twin/assets/{id}`) */
+  name?: string;
+  status?: string;
   source_id: string;
   target_id: string;
   kind: string;
