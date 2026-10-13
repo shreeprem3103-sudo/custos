@@ -1,0 +1,45 @@
+# ---- Python -------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+wheels/
+
+# ---- Runtime state ------------------------------------------------------
+# The command centre's working database and logs are operational state, never
+# source: an EOC must be able to delete them and have the system rebuild.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite3
+logs/
+*.log
+.custos_state.json
+
+# ---- Node / frontend ----------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+.turbo/
+*.tsbuildinfo
+.pnpm-store/
+
+# ---- Secrets ------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ---- Editors / OS -------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
