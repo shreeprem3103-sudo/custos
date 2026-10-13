@@ -171,6 +171,15 @@ def _install_sqlite_pragmas(engine: AsyncEngine) -> None:
             cursor.close()
 
 
+def dialect_name() -> str:
+    """``postgresql`` | ``sqlite`` | ``uninitialised`` - never raises."""
+    return _engine.dialect.name if _engine is not None else "uninitialised"
+
+
+def is_initialised() -> bool:
+    return _engine is not None
+
+
 def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     global _sessionmaker
     if _sessionmaker is None:

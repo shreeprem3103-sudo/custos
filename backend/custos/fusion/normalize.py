@@ -411,6 +411,42 @@ def dedupe_key(sensor_id: str, metric: str, observed_at: datetime, value: float,
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
+#: Physically plausible operating envelope per canonical metric. A reading
+#: outside it is not deleted - a flood breaks instruments - but it is marked so
+#: the fusion layer and the console can discount it instead of believing it.
+PLAUSIBLE_RANGES: dict[str, tuple[float, float]] = {
+    "rainfall_mm_h": (0.0, 500.0),
+    "water_level_m": (-2.0, 30.0),
+    "river_level_m": (-2.0, 30.0),
+    "depth_m": (-1.0, 20.0),
+    "flood_depth_m": (-1.0, 20.0),
+    "tide_m": (-3.0, 8.0),
+    "discharge_m3s": (0.0, 5000.0),
+    "flow_m3s": (0.0, 5000.0),
+    "temperature_c": (-5.0, 60.0),
+    "humidity_pct": (0.0, 100.0),
+    "pressure_hpa": (850.0, 1100.0),
+    "wind_speed_kmh": (0.0, 300.0),
+    "wind_gust_kmh": (0.0, 400.0),
+    "visibility_km": (0.0, 50.0),
+    "traffic_speed_kmh": (0.0, 160.0),
+    "power_kw": (0.0, 1_000_000.0),
+    "voltage_kv": (0.0, 800.0),
+    "population_count": (0.0, 10_000_000.0),
+    "battery_pct": (0.0, 100.0),
+    "pump_rate_m3s": (0.0, 100.0),
+    "siltation_pct": (0.0, 100.0),
+}
+
+
+def in_plausible_range(metric: str, value: float) -> bool:
+    """True when a value fits the metric's physical envelope (unknown: True)."""
+    bounds = PLAUSIBLE_RANGES.get(canonical_metric(metric))
+    if bounds is None:
+        return True
+    return bounds[0] <= float(value) <= bounds[1]
+
+
 def quality_score(
     *,
     timestamp_ok: bool,

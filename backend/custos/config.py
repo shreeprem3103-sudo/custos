@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     access_token_ttl_s: int = 3600
     refresh_token_ttl_s: int = 43_200
     api_keys: str = ""
+    #: "subject:sha256hex:role" entries separated by ';' - the console roster.
+    #: Empty means interactive login is disabled and only API keys work.
+    operator_roster: str = ""
+    allow_self_registration: bool = False
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     rate_limit_rpm: int = 600
     simulator_admin_roles: str = "commander,analyst"

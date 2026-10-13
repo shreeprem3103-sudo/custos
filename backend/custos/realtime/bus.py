@@ -41,6 +41,10 @@ class Event:
     payload: dict[str, Any]
     at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     correlation_id: str = "-"
+    #: Which component produced this event ("scheduler", "operator:rao", ...).
+    #: An incident review always asks "who or what moved this?", and a payload
+    #: convention answers it only if everyone remembers to follow it.
+    source: str = "system"
 
     def to_wire(self) -> dict[str, Any]:
         return {
@@ -50,6 +54,7 @@ class Event:
             "at": self.at.isoformat(),
             "payload": self.payload,
             "correlation_id": self.correlation_id,
+            "source": self.source,
         }
 
 
@@ -128,6 +133,7 @@ class EventBus:
         kind: EventKind | str = EventKind.SYSTEM,
         correlation_id: str = "-",
         persist: bool = True,
+        source: str = "system",
     ) -> Event:
         event = Event(
             seq=self.next_seq,
@@ -135,6 +141,7 @@ class EventBus:
             topic=topic,
             payload=dict(payload),
             correlation_id=correlation_id,
+            source=str(source or "system"),
         )
         async with self._lock:
             self._ring.append(event)

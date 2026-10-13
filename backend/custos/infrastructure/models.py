@@ -526,6 +526,8 @@ class EventLog(Base):
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     correlation_id: Mapped[str] = mapped_column(String(64), default="-")
+    #: producer of the event (component or operator identity), for after-action review
+    source: Mapped[str] = mapped_column(String(64), default="system")
     seq: Mapped[int] = mapped_column(Integer, default=0)
 
 

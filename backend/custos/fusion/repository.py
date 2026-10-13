@@ -51,6 +51,10 @@ from ..infrastructure.models import (
 
 log = get_logger("fusion.repository")
 
+#: convenience re-export: callers that already import the repository should not
+#: have to reach into the infrastructure package for a session
+session_scope = db.session_scope
+
 
 # --------------------------------------------------------------------------- #
 # snapshot construction
@@ -125,6 +129,8 @@ async def _load_edges(session: AsyncSession) -> list[Edge]:
             recovery_hours=float(row.recovery_hours or 6.0),
             redundancy_group=row.redundancy_group,
             attributes=dict(row.attributes or {}),
+            weight=round(float(row.criticality or 0.5) * float(row.attenuation if row.attenuation is not None else 1.0), 4),
+            geometry=(row.attributes or {}).get("geometry"),
         )
         for row in rows
     ]
@@ -400,14 +406,32 @@ async def touch_asset_state(
     await session.execute(update(Asset).where(Asset.id == asset_id).values(**values))
 
 
+def _as_datetime(value: Any) -> datetime:
+    """Accept either a datetime or the wire's ISO-8601 string.
+
+    The bus serialises events for the console; storage stores datetimes. Coercing
+    at the boundary means the mirror can never fail the write for a formatting
+    reason — and a failed mirror write is a hole in the after-action record.
+    """
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    return utcnow()
+
+
 async def record_event(session: AsyncSession, event: Mapping[str, Any]) -> None:
     kwargs: dict[str, Any] = dict(
         kind=str(event["kind"]),
         topic=str(event["topic"]),
-        at=event.get("at") or utcnow(),
+        at=_as_datetime(event.get("at")),
         payload=event.get("payload") or {},
         correlation_id=str(event.get("correlation_id", "-")),
         seq=int(event.get("seq", 0)),
+        source=str(event.get("source", "system")),
     )
     if event.get("id"):
         kwargs["id"] = str(event["id"])
@@ -471,6 +495,21 @@ async def get_system_state(session: AsyncSession, key: str) -> dict[str, Any] | 
 GENESIS_HASH = "0" * 64
 
 
+def canonical_audit_time(value: datetime | None) -> str:
+    """The one timestamp encoding the hash chain is defined over.
+
+    The chain is compared against values that have round-tripped through storage,
+    and not every driver preserves a timezone offset. Fixing the encoding here -
+    always UTC, always microseconds - means a chain written on PostgreSQL verifies
+    on SQLite and vice versa, which is the whole point of an evidence trail.
+    """
+    if value is None:
+        return ""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat(timespec="microseconds")
+
+
 def compute_audit_hash(
     *,
     prev_hash: str,
@@ -506,18 +545,25 @@ async def verify_audit_chain(session: AsyncSession, *, limit: int = 5000) -> dic
     ).scalars().all()
     prev = GENESIS_HASH
     for row in rows:
-        expected = compute_audit_hash(
-            prev_hash=prev,
-            seq=row.seq,
-            at=row.at.isoformat() if row.at else "",
-            actor=row.actor,
-            action=row.action,
-            resource=row.resource,
-            outcome=row.outcome,
-            detail=dict(row.detail or {}),
-        )
-        if expected != row.hash or row.prev_hash != prev:
-            return {"valid": False, "broken_at_seq": row.seq, "entries_checked": len(rows)}
+        common = {
+            "prev_hash": prev,
+            "seq": row.seq,
+            "actor": row.actor,
+            "action": row.action,
+            "resource": row.resource,
+            "outcome": row.outcome,
+            "detail": dict(row.detail or {}),
+        }
+        expected = compute_audit_hash(at=canonical_audit_time(row.at), **common)
+        legacy = compute_audit_hash(at=(row.at.isoformat() if row.at else ""), **common)
+        if row.hash not in {expected, legacy} or row.prev_hash != prev:
+            return {
+                "valid": False,
+                "broken_at_seq": row.seq,
+                "entries_checked": len(rows),
+                "head": prev,
+                "note": "chain hash does not match the recorded entry",
+            }
         prev = row.hash
     return {"valid": True, "entries_checked": len(rows), "head": prev}
 

@@ -639,7 +639,15 @@ class GraphNodeOut(ApiModel):
 
 
 class GraphEdgeOut(RelationshipOut):
-    pass
+    """One dependency edge as the cascade view needs it.
+
+    ``weight`` is the transmission factor actually used by the cascade engine
+    (criticality x attenuation) and ``geometry`` is the GeoJSON line the map
+    draws for the corridor, so the console never has to re-derive either.
+    """
+
+    weight: float = Field(default=0.5, ge=0.0, le=1.0, description="criticality x attenuation")
+    geometry: dict[str, Any] | None = None
 
 
 class GraphOut(ApiModel):

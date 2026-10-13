@@ -282,6 +282,33 @@ class TaskStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class StageName(StrEnum):
+    """The six stages of the CUSTOS operating loop.
+
+    Named here rather than as loose strings because the frontend renders them,
+    the audit trail records them and the orchestration guarantees their order.
+    """
+
+    COLLECT = "collect"
+    FUSE = "fuse"
+    UNDERSTAND = "understand"
+    PREDICT = "predict"
+    SIMULATE = "simulate"
+    RECOMMEND = "recommend"
+
+    @classmethod
+    def ordered(cls) -> tuple["StageName", ...]:
+        return (cls.COLLECT, cls.FUSE, cls.UNDERSTAND, cls.PREDICT, cls.SIMULATE, cls.RECOMMEND)
+
+
+class SimulationStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETE = "complete"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class AuditAction(StrEnum):
     BOOT = "boot"
     LOGIN = "login"

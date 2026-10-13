@@ -95,8 +95,16 @@ class Effect:
         return (self.cause_id, self.target_id, self.relation_kind.value)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class GraphInsights:
+    """Structural analytics of the dependency graph.
+
+    Dataclass rather than dict on purpose: the fields are the analytic contract,
+    and a typo in a consumer should be an AttributeError at import, not a silently
+    absent key at 2 a.m. during a flood. :meth:`to_payload` is the one place that
+    converts to the wire shape, so the API and the engines cannot drift apart.
+    """
+
     computed_at_digest: str
     betweenness: dict[str, float]
     articulation_points: list[str]
@@ -105,6 +113,21 @@ class GraphInsights:
     reach: dict[str, int]
     cascade_depth_by_node: dict[str, int]
     top_critical_paths: list[list[str]]
+
+    def to_payload(self, *, limit: int = 40) -> dict[str, Any]:
+        ranked = sorted(self.betweenness.items(), key=lambda item: item[1], reverse=True)[:limit]
+        return {
+            "computed_at_digest": self.computed_at_digest,
+            "single_points_of_failure": self.single_points_of_failure[:limit],
+            "articulation_points": self.articulation_points[:limit],
+            "bridge_edges": [{"source_id": source, "target_id": target} for source, target in self.bridge_edges[:limit]],
+            "betweenness": [{"asset_id": asset_id, "score": round(score, 5)} for asset_id, score in ranked],
+            "reach": dict(sorted(self.reach.items(), key=lambda item: item[1], reverse=True)[:limit]),
+            "cascade_depth_by_node": dict(sorted(self.cascade_depth_by_node.items(), key=lambda item: item[1], reverse=True)[:limit]),
+            "top_paths": self.top_critical_paths[:limit],
+            "method": "betweenness centrality on the relational graph; single points of failure are assets whose loss "
+                      "removes reachability to a lifeline with no alternative path",
+        }
 
 
 class DependencyGraph:

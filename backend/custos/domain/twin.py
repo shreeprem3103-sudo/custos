@@ -129,6 +129,12 @@ class Edge:
     redundancy_group: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
     id: str = ""
+    #: Transmission factor the cascade engine actually uses (criticality x
+    #: attenuation), materialised here so the map, the API and the engine all
+    #: print the same number instead of each recomputing its own.
+    weight: float = 0.5
+    #: GeoJSON line for the corridor, when the relationship knows one.
+    geometry: dict[str, Any] | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -137,11 +143,13 @@ class Edge:
             "target_id": self.target_id,
             "kind": self.kind.value,
             "criticality": self.criticality,
+            "weight": self.weight,
             "lead_time_min": self.lead_time_min,
             "attenuation": self.attenuation,
             "failure_mode": self.failure_mode.value,
             "recovery_hours": self.recovery_hours,
             "redundancy_group": self.redundancy_group,
+            "geometry": self.geometry,
         }
 
 
@@ -196,6 +204,7 @@ class TwinSnapshot:
 
     __slots__ = (
         "nodes", "edges", "zones", "sensors", "computed_at", "city_id", "city_name", "degraded", "sources",
+        "attributes",
         "_out", "_in", "_adjacent",
     )
 
@@ -220,6 +229,10 @@ class TwinSnapshot:
         self.city_name = city_name
         self.degraded = degraded
         self.sources = tuple(sorted(set(sources)))
+        #: Derived stage output (fusion statistics, prediction, insights). Never
+        #: source-of-truth: everything here can be recomputed from the graph and
+        #: the sensor readings, and nothing here is written back to storage.
+        self.attributes: dict[str, Any] = {}
         self._out: dict[str, list[Edge]] | None = None
         self._in: dict[str, list[Edge]] | None = None
         self._adjacent: dict[str, set[str]] | None = None
@@ -342,6 +355,9 @@ class TwinSnapshot:
             sources=self.sources,
         )
         clone.computed_at = self.computed_at
+        # derived stage output travels with the fork so a simulation can explain
+        # itself in the same terms the console was showing when it was launched
+        clone.attributes = json.loads(json.dumps(self.attributes, default=str))
         return clone
 
     # ---- provenance ------------------------------------------------------

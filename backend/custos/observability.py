@@ -79,6 +79,23 @@ def configure_logging(level: str | None = None) -> None:
         logging.getLogger(noisy).setLevel(max(logging.WARNING, logging.getLogger(noisy).level))
 
 
+def set_correlation_id(value: str | None = None) -> str:
+    """Bind a correlation id to the current task/request context.
+
+    Generated when omitted so that a code path which forgot to propagate an id
+    still produces *traceable* lines rather than a row of dashes.
+    """
+    import uuid
+
+    cid = value or uuid.uuid4().hex[:16]
+    correlation_id.set(cid)
+    return cid
+
+
+def current_correlation_id() -> str:
+    return correlation_id.get()
+
+
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(f"custos.{name}")
 
