@@ -1,0 +1,478 @@
+// ---------------------------------------------------------------------------
+// CUSTOS — Crisis Digital Twin schema (Prisma)
+//
+// GENERATED FILE from the SQLAlchemy models. Do not edit by hand: run
+//     python backend/scripts/export_schema.py
+// `python backend/scripts/export_schema.py --check` fails the build on drift.
+//
+// The application talks to the database through async SQLAlchemy; this file
+// exists so that analysts can query the twin with the Prisma/Node tooling
+// without reverse-engineering the models, and so a reviewer can read the data
+// model in one page.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+model AiInvocations {
+  id String @id
+  thread_id String? @index
+  stage String @default('classify')
+  model String @default('')
+  prompt_digest String @default('')
+  prompt_tokens Int @default(0)
+  completion_tokens Int @default(0)
+  latency_ms Int @default(0)
+  ok Boolean @default(True)
+  fell_back Boolean @default(False)
+  grounded Boolean @default(True)
+  rejected_claims Json
+  evidence_ids Json
+  error String?
+  at DateTime
+
+  @@map("ai_invocations")
+}
+
+model Assets {
+  id String @id
+  name String
+  asset_type String @index
+  subtype String?
+  criticality Float @default(0.5)
+  status String @index @default('ok')
+  lon Float @index @default(0.0)
+  lat Float @index @default(0.0)
+  elevation_m Float?
+  geometry Json
+  zone String?
+  operator String?
+  flood_depth_m Float @default(0.0)
+  power_available Boolean @default(True)
+  access_available Boolean @default(True)
+  service_level Float @default(1.0)
+  exposure_score Float @default(0.0)
+  capacity Json
+  attributes Json
+  state_observed_at DateTime?
+  state_source String?
+  state_confidence Float @default(1.0)
+  created_at DateTime
+  updated_at DateTime
+
+  @@map("assets")
+}
+
+model AuditLog {
+  seq Int @id
+  id String @unique
+  at DateTime @index
+  actor String @default('anonymous')
+  role String @default('viewer')
+  action String @index @default('read')
+  resource String @default('')
+  outcome String @default('ok')
+  detail Json
+  hash String @default('')
+  prev_hash String @default('')
+  correlation_id String @default('-')
+
+  @@map("audit_log")
+}
+
+model CheckpointMirror {
+  id String @id
+  thread_id String @index
+  checkpoint_id String @default('')
+  step Int @default(0)
+  node String @default('')
+  at DateTime @index
+  state_digest String @default('')
+  payload Json
+
+  @@map("checkpoint_mirror")
+}
+
+model ConnectorRuns {
+  id String @id
+  connector String @index
+  started_at DateTime @index
+  finished_at DateTime?
+  ok Boolean @default(True)
+  rows_in Int @default(0)
+  rows_new Int @default(0)
+  latency_ms Int @default(0)
+  error String?
+  degraded_mode Boolean @default(False)
+  detail Json
+
+  @@map("connector_runs")
+}
+
+model Events {
+  id String @id
+  kind String @index
+  topic String @index
+  at DateTime @index
+  payload Json
+  correlation_id String @default('-')
+  source String @default('system')
+  seq Int @default(0)
+
+  @@map("events")
+}
+
+model Incidents {
+  id String @id
+  title String
+  category String @index
+  severity Int @default(3)
+  status String @index @default('detected')
+  confidence Float @default(0.6)
+  summary String @default('')
+  lon Float @default(0.0)
+  lat Float @default(0.0)
+  radius_m Float @default(400.0)
+  zone String?
+  population_exposed Int @default(0)
+  reported_by String @default('system')
+  detected_at DateTime
+  resolved_at DateTime?
+  explainability Json
+  attributes Json
+  created_at DateTime
+  updated_at DateTime
+
+  @@map("incidents")
+}
+
+model Resources {
+  id String @id
+  name String
+  resource_type String @index
+  home_asset_id String?
+  quantity Float @default(1.0)
+  available Float @default(1.0)
+  capabilities Json
+  status String @default('available')
+  attributes Json
+  created_at DateTime
+  updated_at DateTime
+
+  @@map("resources")
+}
+
+model Simulations {
+  id String @id
+  name String
+  description String @default('')
+  status String @index @default('queued')
+  created_by String @default('system')
+  baseline_id String?
+  horizon_minutes Int @default(360)
+  timestep_minutes Int @default(15)
+  ensemble_size Int @default(48)
+  random_seed Int @default(0)
+  request Json
+  result Json
+  kpis Json
+  uncertainty Json
+  timeline Json
+  cascade Json
+  recommendations Json
+  explainability Json
+  sensitivity Json
+  narrative String @default('')
+  determinism_token String @default('')
+  degraded Boolean @default(False)
+  runtime_ms Int @default(0)
+  error String?
+  completed_at DateTime?
+  created_at DateTime
+  updated_at DateTime
+
+  @@map("simulations")
+}
+
+model SystemState {
+  key String @id
+  value Json
+  updated_at DateTime
+
+  @@map("system_state")
+}
+
+model Tasks {
+  id String @id
+  title String
+  description String @default('')
+  status String @index @default('proposed')
+  priority Int @default(3)
+  due_at DateTime?
+  incident_id String? @index
+  simulation_id String?
+  recommendation_id String?
+  assigned_to String?
+  target_asset_id String?
+  resource_requirements Json
+  created_by String @default('system')
+  history Json
+  created_at DateTime
+  updated_at DateTime
+
+  @@map("tasks")
+}
+
+model Zones {
+  id String @id
+  name String
+  lon Float @default(0.0)
+  lat Float @default(0.0)
+  population Int @default(0)
+  vulnerability_index Float @default(0.3)
+  children_pct Float @default(0.0)
+  elderly_pct Float @default(0.0)
+  population_density Float @default(0.0)
+  mean_elevation_m Float @default(0.0)
+  attributes Json
+
+  @@map("zones")
+}
+
+model CascadeEdges {
+  id String @id
+  simulation_id String @index @relation(fields: [simulation_id], references: [id])
+  timestep_min Int @default(0)
+  cause_asset_id String
+  target_asset_id String
+  mechanism String @default('')
+  relation_kind String?
+  hop Int @default(1)
+  magnitude Float @default(0.0)
+  probability Float @default(0.0)
+  status_after String @default('degraded')
+  evidence_ids Json
+
+  @@map("cascade_edges")
+}
+
+model FacilityDetails {
+  asset_id String @id @relation(fields: [asset_id], references: [id])
+  capacity Json
+  autonomy_hours Float @default(0.0)
+  oxygen_hours Float @default(0.0)
+  trauma_level Int @default(0)
+  beds_total Int @default(0)
+  beds_occupied Int @default(0)
+  vulnerable_patients Int @default(0)
+  accepts_evacuees Boolean @default(True)
+  helipad_elevation_m Float?
+
+  @@map("facility_details")
+}
+
+model IncidentAssets {
+  id String @id
+  incident_id String @relation(fields: [incident_id], references: [id])
+  asset_id String @relation(fields: [asset_id], references: [id])
+  role String @default('affected')
+  impact Float @default(0.0)
+
+  @@map("incident_assets")
+}
+
+model IncidentEvents {
+  id String @id
+  incident_id String @index @relation(fields: [incident_id], references: [id])
+  at DateTime
+  stage String @default('understand')
+  actor String @default('system')
+  detail String @default('')
+  evidence_ids Json
+
+  @@map("incident_events")
+}
+
+model IncidentUpdates {
+  id String @id
+  incident_id String @index @relation(fields: [incident_id], references: [id])
+  at DateTime
+  author String @default('system')
+  kind String @default('note')
+  body String @default('')
+  payload Json
+
+  @@map("incident_updates")
+}
+
+model Recommendations {
+  id String @id
+  simulation_id String? @index @relation(fields: [simulation_id], references: [id])
+  incident_id String? @index @relation(fields: [incident_id], references: [id])
+  rank Int @default(1)
+  action String @default('')
+  intervention_type String @default('pre_position_resource')
+  target_id String?
+  window String @default('')
+  rationale String @default('')
+  expected_kpi_delta Json
+  resources_required Json
+  urgency Int @default(3)
+  confidence Float @default(0.6)
+  feasibility Float @default(0.8)
+  evidence_ids Json
+  counterfactual String @default('')
+  generated_by String @default('rules+cascade')
+  accepted Boolean?
+  accepted_by String?
+  accepted_at DateTime?
+  created_at DateTime
+  updated_at DateTime
+
+  @@map("recommendations")
+}
+
+model Relationships {
+  id String @id
+  source_id String @relation(fields: [source_id], references: [id])
+  target_id String @relation(fields: [target_id], references: [id])
+  kind String @index
+  criticality Float @default(0.5)
+  lead_time_min Int @default(0)
+  attenuation Float @default(1.0)
+  failure_mode String @default('immediate')
+  recovery_hours Float @default(6.0)
+  redundancy_group String?
+  active Boolean @default(True)
+  attributes Json
+  created_at DateTime
+  updated_at DateTime
+
+  @@map("relationships")
+}
+
+model ResourceAssignments {
+  id String @id
+  resource_id String @relation(fields: [resource_id], references: [id])
+  task_id String?
+  simulation_id String?
+  quantity Float @default(1.0)
+  from_asset_id String?
+  to_asset_id String?
+  depart_min Int @default(0)
+  eta_min Int?
+  route_asset_ids Json
+  status String @default('planned')
+  at DateTime
+
+  @@map("resource_assignments")
+}
+
+model RoadDetails {
+  asset_id String @id @relation(fields: [asset_id], references: [id])
+  length_m Float @default(0.0)
+  lanes Int @default(2)
+  free_flow_speed_kmh Float @default(40.0)
+  flood_threshold_m Float @default(0.3)
+  heavy_threshold_m Float @default(0.6)
+  is_evacuation_route Boolean @default(False)
+  is_bridge Boolean @default(False)
+  underpass Boolean @default(False)
+  altitude_profile Json
+
+  @@map("road_details")
+}
+
+model Sensors {
+  id String @id
+  name String
+  metric String @index
+  unit String @default('')
+  provider String @default('synthetic')
+  source_ref String?
+  asset_id String? @index @relation(fields: [asset_id], references: [id])
+  zone String? @index
+  lon Float @default(0.0)
+  lat Float @default(0.0)
+  elevation_m Float?
+  expected_min Float?
+  expected_max Float?
+  baseline_median Float?
+  baseline_mad Float?
+  sample_count Int @default(0)
+  is_active Boolean @default(True)
+  attributes Json
+  created_at DateTime
+
+  @@map("sensors")
+}
+
+model ShelterDetails {
+  asset_id String @id @relation(fields: [asset_id], references: [id])
+  capacity_people Int @default(0)
+  occupancy Int @default(0)
+  has_water Boolean @default(True)
+  has_power_backup Boolean @default(True)
+  accessible_for_disability Boolean @default(False)
+  opening_time_min Int @default(0)
+
+  @@map("shelter_details")
+}
+
+model SimulationEvents {
+  id String @id
+  simulation_id String @index @relation(fields: [simulation_id], references: [id])
+  seq Int @default(0)
+  at DateTime
+  stage String @default('simulate')
+  progress Float @default(0.0)
+  message String @default('')
+  payload Json
+
+  @@map("simulation_events")
+}
+
+model Anomalies {
+  id String @id
+  sensor_id String @index @relation(fields: [sensor_id], references: [id])
+  metric String @default('')
+  observed_at DateTime @index
+  observed_value Float @default(0.0)
+  expected_value Float @default(0.0)
+  z_score Float @default(0.0)
+  severity String @index @default('watch')
+  method String @default('robust-zscore')
+  explanation String @default('')
+  confidence Float @default(0.6)
+  acknowledged Boolean @default(False)
+  promoted_incident_id String? @relation(fields: [promoted_incident_id], references: [id])
+  evidence Json
+
+  @@map("anomalies")
+}
+
+model SensorReadings {
+  id String @id
+  sensor_id String @index @relation(fields: [sensor_id], references: [id])
+  metric String
+  value Float
+  unit String @default('')
+  quality Float @default(1.0)
+  observed_at DateTime @index
+  ingested_at DateTime
+  source String @default('synthetic')
+  dedupe_key String
+  is_outlier Boolean @default(False)
+  raw Json
+
+  @@map("sensor_readings")
+}
+
